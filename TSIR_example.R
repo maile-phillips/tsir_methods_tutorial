@@ -24,7 +24,7 @@ meas <- twentymeas$London %>% #load data from tsir package
          biweek= ceiling(week/2) ) %>%
   filter(biweek != 27)
 
-
+head(meas)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*------#
 # Step 1: Reconstruct susceptible and infectious populations (slide 15)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*------#
@@ -44,12 +44,12 @@ cumreg <- lm(cumsum(births) ~ cumsum(cases), data = meas)
 
 # Under-reporting factor:
 summary(cumreg)
-coef(cumreg)[2] # This is 1/rho, so...
-rho <- 1/coef(cumreg)[2]
+coef(cumreg)[2]
+rho <- coef(cumreg)[2]
 rho
 
 # True number of measles cases through time:
-I_t <- (1/rho)*meas$cases
+I_t <- (rho)*meas$cases
 I_t
 
 # PLOT: Reported (Yt) vs. true number of cases (I_t)
@@ -71,22 +71,22 @@ D_t <- cumreg$residuals
 # Step 2: Fit the TSIR model
 #-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*-----*------#
 
-# Create matrix "seas" with 1s on diagonal and 0s elsewhere (identity matrix)
+# Create matrix "seas" with 1s on diagonal and 0s elsewhere 
 # (We do this to estimate 26 annual seasonal values of beta)
 tf <- nrow(meas) # 546 timepoints (26 biweeks x 21 years)
-seas <- matrix(NA,545,26) 
-for (i in 1:(tf-1)) for (j in 1:26){
-  seas[i,j] = ifelse((meas$biweek[i])==j,1,0)
-}
-seas[1:10,1:10]
+timespyr <- 26
+numyears <- tf/timespyr
+seas <- matrix(rep(diag(timespyr), numyears), ncol=timespyr, byrow=T)
+seas[1:10,1:10] #check
 
 # Create log-transformed I_(t+1) (lInew_ and I_t (lI_t)
 lInew <- log(as.vector(I_t)[2:tf])
 lI_t <- log(as.vector(I_t)[1:(tf-1)])
 head(cbind(lI_t,lInew)) #check
 
-# Ensure D_t lines up and is same dimension as other vectors
+# Ensure D_t and seas lines up and is same dimension as other vectors
 D_t <- as.vector(D_t)[1:(tf-1)]
+seas <- seas[1:(tf-1),]
 
 # Approximate London population
 N <- 3300000 
@@ -120,10 +120,10 @@ lS_t <- log(Sbar_estim + D_t)
 bestmod <- glm(lInew ~ lI_t + seas, offset = lS_t) 
 
 # PLOT
-plot(x = df$time, y = (I_t), type='l',col='blue',
+plot(x = meas$time, y = (I_t), type='l',col='blue',
      ylim = c(0, max(exp(bestmod$fitted.values))),
      xlab='Year', ylab='Cases')
-lines(x=df$time[2:tf], 
+lines(x=meas$time[2:tf], 
       y=exp(bestmod$fitted.values), 
       col='red') 
 
